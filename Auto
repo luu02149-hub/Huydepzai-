@@ -1,0 +1,222 @@
+-- Roblox Boss Auto Farm Script with UI (Full Edition)
+-- Optimized Final Version by ChatGPT - Việt Nam Edition
+
+------------------------------------------------
+-- Roblox Services
+------------------------------------------------
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualUser = game:GetService("VirtualUser")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+------------------------------------------------
+-- Variables
+------------------------------------------------
+local flying = false
+local autoAttack = false
+local followBoss = false
+local autoSkill = {Z = false, X = false, C = false, V = false}
+local flySpeed = 2
+local bossName = "BOSS"
+local bossHeight = 15
+local skillDelay = 1
+
+------------------------------------------------
+-- UI Library (OrionLib)
+------------------------------------------------
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+
+local Window = OrionLib:MakeWindow({
+    Name = "BOSS AUTO FARM 🇻🇳",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "BossFarmConfig"
+})
+
+-- Hotkey để mở/đóng UI (RightControl)
+OrionLib:SetToggleKey(Enum.KeyCode.RightControl)
+
+------------------------------------------------
+-- Tabs
+------------------------------------------------
+local MainTab = Window:MakeTab({Name = "Chức Năng", Icon = "rbxassetid://4483345998"})
+local SkillTab = Window:MakeTab({Name = "Auto Skill", Icon = "rbxassetid://4483345998"})
+local TeleportTab = Window:MakeTab({Name = "Teleport", Icon = "rbxassetid://4483345998"})
+
+------------------------------------------------
+-- 1. Fly System
+------------------------------------------------
+MainTab:AddToggle({
+    Name = "Fly (Bay)",
+    Default = false,
+    Callback = function(Value) flying = Value end
+})
+
+MainTab:AddSlider({
+    Name = "Tốc độ bay",
+    Min = 1, Max = 10, Default = 2,
+    Color = Color3.fromRGB(0, 170, 255),
+    Increment = 1,
+    ValueName = "speed",
+    Callback = function(Value) flySpeed = Value end
+})
+
+-- Điều khiển bay bằng WASD
+RunService.RenderStepped:Connect(function()
+    if flying and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local hrp = LocalPlayer.Character.HumanoidRootPart
+        local moveDirection = Vector3.new(0, 0, 0)
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDirection = moveDirection + hrp.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDirection = moveDirection - hrp.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDirection = moveDirection - hrp.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDirection = moveDirection + hrp.CFrame.RightVector end
+
+        if moveDirection.Magnitude > 0 then
+            hrp.CFrame = hrp.CFrame + moveDirection.Unit * flySpeed
+        end
+    end
+end)
+
+------------------------------------------------
+-- 2. Auto Attack
+------------------------------------------------
+MainTab:AddToggle({
+    Name = "Auto Attack (Đánh liên tục)",
+    Default = false,
+    Callback = function(Value) autoAttack = Value end
+})
+
+spawn(function()
+    while task.wait(0.1) do
+        if autoAttack then
+            VirtualUser:ClickButton1(Vector2.new())
+        end
+    end
+end)
+
+------------------------------------------------
+-- 3. Follow Boss
+------------------------------------------------
+MainTab:AddTextbox({
+    Name = "Tên Boss",
+    Default = "BOSS",
+    TextDisappear = false,
+    Callback = function(Value)
+        bossName = Value
+        OrionLib:MakeNotification({
+            Name = "Boss Name Updated",
+            Content = "Đã đặt tên Boss thành: " .. bossName,
+            Image = "rbxassetid://4483345998",
+            Time = 3
+        })
+    end
+})
+
+MainTab:AddToggle({
+    Name = "Theo Boss (Follow Boss)",
+    Default = false,
+    Callback = function(Value) followBoss = Value end
+})
+
+spawn(function()
+    while task.wait(0.1) do
+        if followBoss then
+            local boss = workspace:FindFirstChild(bossName)
+            if boss and boss:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                local distance = (LocalPlayer.Character.HumanoidRootPart.Position - boss.HumanoidRootPart.Position).Magnitude
+                local tweenTime = math.clamp(distance / 50, 0.1, 0.5)
+                local targetPosition = boss.HumanoidRootPart.Position + Vector3.new(0, bossHeight, 0)
+
+                local tween = TweenService:Create(
+                    LocalPlayer.Character.HumanoidRootPart,
+                    TweenInfo.new(tweenTime, Enum.EasingStyle.Linear),
+                    {CFrame = CFrame.new(targetPosition)}
+                )
+                tween:Play()
+            end
+        end
+    end
+end)
+
+------------------------------------------------
+-- 4. Auto Skill
+------------------------------------------------
+local function pressKey(key)
+    keypress(key)
+    task.wait(0.1)
+    keyrelease(key)
+end
+
+SkillTab:AddSlider({
+    Name = "Delay giữa các skill",
+    Min = 0.2, Max = 3, Default = 1,
+    Color = Color3.fromRGB(255, 170, 0),
+    Increment = 0.1,
+    ValueName = "giây",
+    Callback = function(Value) skillDelay = Value end
+})
+
+for _, key in ipairs({"Z", "X", "C", "V"}) do
+    SkillTab:AddToggle({
+        Name = "Auto Skill " .. key,
+        Default = false,
+        Callback = function(Value) autoSkill[key] = Value end
+    })
+end
+
+spawn(function()
+    while task.wait(skillDelay) do
+        for key, enabled in pairs(autoSkill) do
+            if enabled then pressKey(Enum.KeyCode[key]) end
+        end
+    end
+end)
+
+------------------------------------------------
+-- 5. Teleport Farm
+------------------------------------------------
+TeleportTab:AddButton({
+    Name = "Teleport đến Boss",
+    Callback = function()
+        local boss = workspace:FindFirstChild(bossName)
+        if boss and boss:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = boss.HumanoidRootPart.CFrame + Vector3.new(0, bossHeight, 0)
+            OrionLib:MakeNotification({
+                Name = "Teleport",
+                Content = "Đã dịch chuyển đến Boss!",
+                Image = "rbxassetid://4483345998",
+                Time = 3
+            })
+        else
+            OrionLib:MakeNotification({
+                Name = "Lỗi",
+                Content = "Không tìm thấy Boss!",
+                Image = "rbxassetid://4483345998",
+                Time = 3
+            })
+        end
+    end
+})
+
+TeleportTab:AddButton({
+    Name = "Teleport đến Safe Zone",
+    Callback = function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = CFrame.new(0, 10, 0)
+            OrionLib:MakeNotification({
+                Name = "Teleport",
+                Content = "Đã dịch chuyển về Safe Zone!",
+                Image = "rbxassetid://4483345998",
+                Time = 3
+            })
+        end
+    end
+})
+
+------------------------------------------------
+-- Start UI
+------------------------------------------------
+OrionLib:Init()
